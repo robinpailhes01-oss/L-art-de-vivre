@@ -1,0 +1,11 @@
+# Config Supabase CLI — L'art de vivre.
+# project_id local (le lien vers le projet distant se fait via `supabase link`).
+project_id = "l-art-de-vivre"
+
+# Les deux fonctions sont appelées service-à-service avec un secret partagé
+# dédié (x-agent-secret / x-cron-secret) — pas de JWT utilisateur.
+[functions.agent-concierge]
+verify_jwt = false
+
+[functions.agent-followups]
+verify_jwt = false
