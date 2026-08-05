@@ -1,7 +1,7 @@
 {
   "name": "baileys-service",
   "version": "1.0.0",
-  "description": "WhatsApp bridge for Agent Léa using Baileys",
+  "description": "Pont WhatsApp (Baileys) pour Apolline — L'art de vivre",
   "type": "module",
   "scripts": {
     "build": "tsc",

@@ -1,11 +1,12 @@
-export async function askLea(message: string, phone: string): Promise<string> {
-  const url = `${process.env.SUPABASE_URL}/functions/v1/agent-lea`;
+// Appel du cerveau (Edge Function agent-concierge).
+export async function askAgent(message: string, phone: string): Promise<string> {
+  const url = `${process.env.SUPABASE_URL}/functions/v1/agent-concierge`;
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
     'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY!,
   };
-  if (process.env.LEA_SHARED_SECRET) headers['x-lea-secret'] = process.env.LEA_SHARED_SECRET;
+  if (process.env.AGENT_SHARED_SECRET) headers['x-agent-secret'] = process.env.AGENT_SHARED_SECRET;
   const res = await fetch(url, {
     method: 'POST',
     headers,
@@ -13,7 +14,7 @@ export async function askLea(message: string, phone: string): Promise<string> {
   });
 
   if (!res.ok) {
-    console.error('[lea] error', res.status, await res.text());
+    console.error('[agent] error', res.status, await res.text());
     return '';
   }
 

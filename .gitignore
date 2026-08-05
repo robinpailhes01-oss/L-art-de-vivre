@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# baileys-service (projet Node séparé)
+baileys-service/node_modules/
+baileys-service/dist/

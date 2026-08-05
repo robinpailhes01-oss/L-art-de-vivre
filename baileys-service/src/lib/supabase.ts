@@ -60,6 +60,16 @@ export async function useSupabaseAuthState() {
   };
 }
 
+// Vide la table wa_auth_state — appelé quand WhatsApp invalide la session
+// (déconnexion de l'appareil lié). Sans ça, le service resterait coincé avec
+// des credentials morts au lieu de générer un nouveau QR.
+export async function clearSupabaseAuthState() {
+  const { error } = await supabase.from('wa_auth_state').delete().neq('id', '');
+  if (error) throw error;
+}
+
+// ── Conversations & messages ─────────────────────────────────────────
+
 export async function upsertConversation(customerPhone: string, customerName?: string) {
   const { data } = await supabase
     .from('wa_conversations')
@@ -85,7 +95,6 @@ export async function saveMessage(
     is_from_human: isFromHuman,
     body,
     wa_message_id: waMessageId ?? null,
-    created_at: new Date().toISOString(),
   });
 }
 
@@ -123,10 +132,57 @@ export async function resumeConversation(customerPhone: string) {
     .eq('customer_phone', customerPhone);
 }
 
-// Vide la table wa_auth_state — appelé quand WhatsApp invalide la session
-// (déconnexion de l'appareil lié dans WhatsApp Business). Sans ça, le service
-// resterait coincé avec des credentials morts au lieu de générer un nouveau QR.
-export async function clearSupabaseAuthState() {
-  const { error } = await supabase.from('wa_auth_state').delete().neq('id', '');
-  if (error) throw error;
+// ── Buffer de debounce (wa_inbox) ────────────────────────────────────
+
+/** Insère un message dans le buffer. false si doublon (écho Baileys). */
+export async function insertInbox(waMessageId: string, phone: string, text: string): Promise<boolean> {
+  const { error } = await supabase.from('wa_inbox').insert({
+    wa_message_id: waMessageId,
+    phone,
+    text,
+  });
+  if (error) {
+    // 23505 = contrainte unique wa_message_id → doublon attendu, no-op.
+    if (error.code === '23505') return false;
+    console.error('[supabase] insertInbox:', error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function fetchPendingInbox(phone: string): Promise<Array<{ id: number; text: string }>> {
+  const { data, error } = await supabase
+    .from('wa_inbox')
+    .select('id, text')
+    .eq('phone', phone)
+    .is('processed_at', null)
+    .order('received_at', { ascending: true });
+  if (error) {
+    console.error('[supabase] fetchPendingInbox:', error.message);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function markInboxProcessed(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  await supabase
+    .from('wa_inbox')
+    .update({ processed_at: new Date().toISOString() })
+    .in('id', ids);
+}
+
+/** Numéros ayant des messages non traités plus vieux que minAgeMs. */
+export async function pendingInboxPhones(minAgeMs: number): Promise<string[]> {
+  const cutoff = new Date(Date.now() - minAgeMs).toISOString();
+  const { data, error } = await supabase
+    .from('wa_inbox')
+    .select('phone')
+    .is('processed_at', null)
+    .lt('received_at', cutoff);
+  if (error) {
+    console.error('[supabase] pendingInboxPhones:', error.message);
+    return [];
+  }
+  return [...new Set((data ?? []).map((r) => r.phone as string))];
 }

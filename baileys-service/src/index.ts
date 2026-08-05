@@ -1,19 +1,43 @@
 import express from 'express';
 import qrcode from 'qrcode';
-import { connectToWhatsApp, getQR, isConnected, getSock } from './lib/whatsapp.js';
-import { supabase, pauseConversation, resumeConversation, saveMessage, upsertConversation } from './lib/supabase.js';
+import {
+  connectToWhatsApp,
+  getQR,
+  isConnected,
+  sendAsAgent,
+  sendRaw,
+  resolveJid,
+  getSock,
+} from './lib/whatsapp.js';
+import {
+  pauseConversation,
+  resumeConversation,
+  saveMessage,
+  upsertConversation,
+} from './lib/supabase.js';
 
 const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT ?? 3001;
+const SECRET = process.env.BAILEYS_SERVICE_SECRET ?? '';
 
-// Health check
+// Health check — public (healthcheck Railway).
 app.get('/health', (_req, res) => {
   res.json({ ok: true, connected: isConnected() });
 });
 
-// QR code as base64 PNG (poll this from the Next.js dashboard)
+// Tout le reste exige le secret partagé (dette Harmonie Yacht corrigée :
+// ses endpoints /send et /qr étaient ouverts).
+app.use((req, res, next) => {
+  if (!SECRET) return next(); // secret non configuré (dev local)
+  if (req.headers['x-baileys-secret'] !== SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  next();
+});
+
+// QR code en base64 PNG (pollé par la page /agent du dashboard).
 app.get('/qr', async (_req, res) => {
   if (isConnected()) return res.json({ status: 'connected' });
   const qr = getQR();
@@ -22,7 +46,7 @@ app.get('/qr', async (_req, res) => {
   res.json({ status: 'pending', qr: dataUrl });
 });
 
-// Pause Léa for a conversation
+// Pause de l'agent pour une conversation.
 app.post('/pause/:phone', async (req, res) => {
   const { phone } = req.params;
   const hours: number = req.body.hours ?? 24;
@@ -30,47 +54,26 @@ app.post('/pause/:phone', async (req, res) => {
   res.json({ ok: true });
 });
 
-// Resume Léa for a conversation
+// Reprise de l'agent pour une conversation.
 app.post('/resume/:phone', async (req, res) => {
   const { phone } = req.params;
   await resumeConversation(phone);
   res.json({ ok: true });
 });
 
-// Send a manual message from the inbox (human reply)
+// Envoi manuel depuis l'inbox du dashboard (réponse humaine) :
+// persisté comme humain + pause de l'agent 24h (l'équipe a repris la main).
 app.post('/send', async (req, res) => {
   const { phone, message } = req.body as { phone: string; message: string };
   const sock = getSock();
   if (!sock || !isConnected()) {
     return res.status(503).json({ error: 'WhatsApp non connecté' });
   }
-  const cleanPhone = phone.replace('+', '');
   try {
-    // Vérifie d'abord que le numéro existe sur WhatsApp via lookup E.164.
-    const exists = await sock.onWhatsApp(cleanPhone);
-    const match = exists?.find((e) => e.exists);
-
-    let jid: string;
-    if (match) {
-      jid = match.jid;
-    } else {
-      // Fallback LID (WhatsApp privacy mode) : si on a déjà une conversation
-      // avec ce "phone", le numéro est un LID valide qui ne se résout pas via
-      // onWhatsApp() mais sur lequel sendMessage(<digits>@lid) fonctionne quand
-      // même. C'est exactement ce que fait Baileys quand le client nous écrit.
-      const { data: conv } = await supabase
-        .from('wa_conversations')
-        .select('id')
-        .eq('customer_phone', phone)
-        .maybeSingle();
-      if (!conv) {
-        return res.status(404).json({ error: `Numéro ${phone} introuvable sur WhatsApp` });
-      }
-      jid = `${cleanPhone}@lid`;
-    }
+    const jid = await resolveJid(phone);
+    if (!jid) return res.status(404).json({ error: `Numéro ${phone} introuvable sur WhatsApp` });
 
     const sent = await sock.sendMessage(jid, { text: message });
-    // Save + pause (human is taking over)
     const conv = await upsertConversation(phone);
     if (conv) {
       await saveMessage(conv.id, true, message, true, sent?.key?.id ?? undefined);
@@ -82,7 +85,22 @@ app.post('/send', async (req, res) => {
   }
 });
 
+// Envoi "agent" (relances agent-followups, message final d'escalade) :
+// signé agent, simulation de frappe, PAS de pause.
+app.post('/send-agent', async (req, res) => {
+  const { phone, message } = req.body as { phone: string; message: string };
+  const result = await sendAsAgent(phone, message);
+  res.status(result.ok ? 200 : 503).json(result);
+});
+
+// Notification au gérant : envoi brut, aucune persistance conversationnelle.
+app.post('/notify', async (req, res) => {
+  const { phone, message } = req.body as { phone: string; message: string };
+  const result = await sendRaw(phone, message);
+  res.status(result.ok ? 200 : 503).json(result);
+});
+
 app.listen(PORT, () => {
-  console.log(`🚀 Baileys service on port ${PORT}`);
+  console.log(`🚀 Baileys service (Apolline) on port ${PORT}`);
   connectToWhatsApp().catch(console.error);
 });
