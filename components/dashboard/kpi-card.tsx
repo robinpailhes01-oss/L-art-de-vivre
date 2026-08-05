@@ -45,7 +45,7 @@ export function KpiCard({
           <AnimatedNumber
             value={value}
             format={format}
-            className="text-[1.6rem] leading-none font-semibold tracking-tight text-foreground"
+            className="kpi-figure text-[2rem] leading-none text-foreground"
           />
           {delta ? (
             <span

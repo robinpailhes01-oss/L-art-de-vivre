@@ -1,4 +1,4 @@
-import { formatEur } from "@/lib/format";
+import { formatEur, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
@@ -6,11 +6,14 @@ const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
 export function MonthlyBars({
   values,
   currentMonth,
+  format = "int",
 }: {
   values: number[];
   currentMonth: number;
+  format?: "int" | "eur";
 }) {
   const max = Math.max(...values, 1);
+  const fmt = format === "eur" ? formatEur : formatNumber;
 
   return (
     <div className="flex h-44 items-stretch gap-1.5">
@@ -19,7 +22,7 @@ export function MonthlyBars({
         const heightPct = Math.round((value / max) * 100);
         return (
           <div key={i} className="group/bar flex flex-1 flex-col items-center gap-2">
-            <div className="flex min-h-0 w-full flex-1 items-end" title={formatEur(value)}>
+            <div className="flex min-h-0 w-full flex-1 items-end" title={fmt(value)}>
               <div
                 className={cn(
                   "animate-grow w-full rounded-md bg-gradient-to-t transition-[filter] duration-200 group-hover/bar:brightness-105",
