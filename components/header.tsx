@@ -64,6 +64,16 @@ export function Header({
             <SidebarNav onNavigate={() => setMobileOpen(false)} />
           </SheetContent>
         </Sheet>
+
+        {/* Logotype mobile — sur desktop, la sidebar porte déjà la marque. */}
+        <Link href="/" className="flex flex-col md:hidden">
+          <span className="font-display text-lg font-semibold italic leading-tight tracking-tight text-primary">
+            L&apos;art de vivre
+          </span>
+          <span className="text-[9px] uppercase tracking-[0.22em] text-champagne">
+            Conciergerie privée
+          </span>
+        </Link>
       </div>
 
       <DropdownMenu>
