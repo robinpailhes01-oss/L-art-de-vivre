@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { demoWaMessages, isDemo } from '@/lib/demo';
 import { createClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   const phone = req.nextUrl.searchParams.get('phone');
   if (!phone) return NextResponse.json({ error: 'phone requis' }, { status: 400 });
+
+  if (isDemo()) return NextResponse.json(demoWaMessages[phone] ?? []);
 
   const supabase = await createClient();
 

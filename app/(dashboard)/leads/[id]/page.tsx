@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Archive, BadgeCheck, Send, Undo2, XCircle } from "lucide-react";
 
+import { demoConversations, demoLeads, isDemo } from "@/lib/demo";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,23 +34,31 @@ export default async function LeadDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
 
-  const [{ data: lead }, { data: conv }] = await Promise.all([
-    supabase.from("leads").select("*").eq("id", id).maybeSingle(),
-    supabase
-      .from("conversations")
-      .select("messages")
-      .eq("lead_id", id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  let lead;
+  let messages: ChatMsg[];
+  if (isDemo()) {
+    lead = demoLeads.find((l) => l.id === id) ?? null;
+    messages = demoConversations[id] ?? [];
+  } else {
+    const supabase = await createClient();
+    const [{ data: leadRow }, { data: conv }] = await Promise.all([
+      supabase.from("leads").select("*").eq("id", id).maybeSingle(),
+      supabase
+        .from("conversations")
+        .select("messages")
+        .eq("lead_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    lead = leadRow;
+    messages = (Array.isArray(conv?.messages) ? conv.messages : []) as ChatMsg[];
+  }
 
   if (!lead) notFound();
 
   const badge = leadStatusBadge(lead.status);
-  const messages = (Array.isArray(conv?.messages) ? conv.messages : []) as ChatMsg[];
   const now = Date.now();
 
   const facts: Array<[string, string | null]> = [

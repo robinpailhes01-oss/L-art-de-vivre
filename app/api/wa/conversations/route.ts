@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
+import { demoWaConversations, isDemo } from '@/lib/demo';
 import { createClient } from '@/lib/supabase/server';
 
 export async function GET() {
+  if (isDemo()) return NextResponse.json(demoWaConversations);
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('wa_conversations')

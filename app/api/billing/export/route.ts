@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { computeBillableEur, currentMonth, getMonthUsage } from "@/lib/billing";
+import { isDemo } from "@/lib/demo";
 import { createClient } from "@/lib/supabase/server";
 
 // Export CSV du mois : une ligne par jour × source × modèle + ligne TOTAL.
 // Colonnes en français, séparateur ';' (Excel FR), montants avec marge —
 // c'est le fichier joint à la facture du client.
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "non authentifié" }, { status: 401 });
+  const supabase = isDemo() ? null : await createClient();
+  if (supabase) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "non authentifié" }, { status: 401 });
+  }
 
   const month = req.nextUrl.searchParams.get("month") ?? currentMonth();
   if (!/^\d{4}-\d{2}$/.test(month)) {

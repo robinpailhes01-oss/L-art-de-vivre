@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 
+import { demoLeads, isDemo } from "@/lib/demo";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -35,26 +36,34 @@ export default async function LeadsPage({
   searchParams: Promise<Search>;
 }) {
   const { status, service, filter } = await searchParams;
-  const supabase = await createClient();
 
-  let query = supabase
-    .from("leads")
-    .select("*")
-    .eq("archived", false)
-    .order("last_interaction_at", { ascending: false, nullsFirst: false })
-    .limit(200);
+  let leads;
+  if (isDemo()) {
+    leads = demoLeads
+      .filter((l) => !status || l.status === status)
+      .filter((l) => !service || l.service_type === service)
+      .filter((l) => filter !== "escalated" || l.needs_human_intervention)
+      .sort((a, b) => (b.last_interaction_at ?? "").localeCompare(a.last_interaction_at ?? ""));
+  } else {
+    const supabase = await createClient();
+    let query = supabase
+      .from("leads")
+      .select("*")
+      .eq("archived", false)
+      .order("last_interaction_at", { ascending: false, nullsFirst: false })
+      .limit(200);
 
-  if (status && (LEAD_STATUSES as readonly string[]).includes(status)) {
-    query = query.eq("status", status as (typeof LEAD_STATUSES)[number]);
+    if (status && (LEAD_STATUSES as readonly string[]).includes(status)) {
+      query = query.eq("status", status as (typeof LEAD_STATUSES)[number]);
+    }
+    if (service && (SERVICE_TYPES as readonly string[]).includes(service)) {
+      query = query.eq("service_type", service);
+    }
+    if (filter === "escalated") {
+      query = query.eq("needs_human_intervention", true);
+    }
+    leads = (await query).data;
   }
-  if (service && (SERVICE_TYPES as readonly string[]).includes(service)) {
-    query = query.eq("service_type", service);
-  }
-  if (filter === "escalated") {
-    query = query.eq("needs_human_intervention", true);
-  }
-
-  const { data: leads } = await query;
   const now = Date.now();
 
   const filterHref = (patch: Partial<Search>) => {

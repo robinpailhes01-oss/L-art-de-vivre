@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { isDemo } from "@/lib/demo";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
 
@@ -16,6 +17,7 @@ async function getConfigRow() {
 }
 
 async function patchConfig(patch: Record<string, Json | boolean | number>) {
+  if (isDemo()) return; // mode démo — rien à persister
   const { supabase, config } = await getConfigRow();
   const { error } = await supabase
     .from("agent_config")
@@ -30,6 +32,7 @@ const csv = (fd: FormData, key: string) =>
   str(fd, key).split(",").map((s) => s.trim()).filter(Boolean);
 
 export async function updateIdentity(formData: FormData): Promise<void> {
+  if (isDemo()) return;
   const { config } = await getConfigRow();
   const identity = { ...(config.identity as Record<string, Json>) };
   identity.agent_name = str(formData, "agent_name") || "Apolline";
@@ -40,6 +43,7 @@ export async function updateIdentity(formData: FormData): Promise<void> {
 }
 
 export async function updateService(serviceKey: string, formData: FormData): Promise<void> {
+  if (isDemo()) return;
   const { config } = await getConfigRow();
   const services = { ...(config.services as Record<string, Json>) };
   const current = (services[serviceKey] ?? {}) as Record<string, Json>;
@@ -54,6 +58,7 @@ export async function updateService(serviceKey: string, formData: FormData): Pro
 }
 
 export async function updateFaq(formData: FormData): Promise<void> {
+  if (isDemo()) return;
   const { config } = await getConfigRow();
   const faq = { ...(config.faq as Record<string, Json>) };
   for (const key of ["delai_reponse", "acompte", "annulation", "zones_couvertes", "confidentialite"]) {
@@ -63,6 +68,7 @@ export async function updateFaq(formData: FormData): Promise<void> {
 }
 
 export async function updateHours(formData: FormData): Promise<void> {
+  if (isDemo()) return;
   const { config } = await getConfigRow();
   const business_hours = { ...(config.business_hours as Record<string, Json>) };
   business_hours.equipe = str(formData, "equipe");

@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 
 import { baileysFetch } from "@/lib/baileys";
+import { isDemo } from "@/lib/demo";
 import { createClient } from "@/lib/supabase/server";
 import type { LeadStatus } from "@/types/database";
 
 /** Relance manuelle : appelle agent-followups en mode lead_id (bypass intervalle). */
 export async function relaunchLead(leadId: string): Promise<{ ok: boolean; error?: string }> {
+  if (isDemo()) return { ok: false, error: "Mode démo — action désactivée" };
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const cronSecret = process.env.CRON_SECRET;
   if (!url || !cronSecret) return { ok: false, error: "CRON_SECRET non configuré côté Vercel" };
@@ -30,6 +32,7 @@ export async function relaunchLead(leadId: string): Promise<{ ok: boolean; error
 }
 
 export async function setLeadStatus(leadId: string, status: LeadStatus): Promise<{ ok: boolean; error?: string }> {
+  if (isDemo()) return { ok: false, error: "Mode démo — action désactivée" };
   const supabase = await createClient();
   const { error } = await supabase
     .from("leads")
@@ -41,6 +44,7 @@ export async function setLeadStatus(leadId: string, status: LeadStatus): Promise
 }
 
 export async function archiveLead(leadId: string): Promise<{ ok: boolean; error?: string }> {
+  if (isDemo()) return { ok: false, error: "Mode démo — action désactivée" };
   const supabase = await createClient();
   const { error } = await supabase
     .from("leads")
@@ -55,6 +59,7 @@ export async function archiveLead(leadId: string): Promise<{ ok: boolean; error?
  * (needs_human_intervention = false + reprise de la conversation WhatsApp).
  */
 export async function resolveEscalation(leadId: string): Promise<{ ok: boolean; error?: string }> {
+  if (isDemo()) return { ok: false, error: "Mode démo — action désactivée" };
   const supabase = await createClient();
   const { data: lead, error } = await supabase
     .from("leads")

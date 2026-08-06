@@ -9,9 +9,11 @@
 // included_amount_eur, overage_multiplier sont déjà en base).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { demoBillingSettings, demoUsageEvents, isDemo } from "@/lib/demo";
 import type { Database, Tables } from "@/types/database";
 
-type Supabase = SupabaseClient<Database>;
+// null = mode démo (aucun Supabase configuré) — données fictives.
+type Supabase = SupabaseClient<Database> | null;
 
 export type BillingSettings = Tables<"billing_settings">;
 
@@ -62,27 +64,45 @@ export function computeBillableEur(costUsd: number, s: BillingSettings): number 
 }
 
 export async function getBillingSettings(supabase: Supabase): Promise<BillingSettings> {
+  if (!supabase || isDemo()) return demoBillingSettings as BillingSettings;
   const { data } = await supabase.from("billing_settings").select("*").limit(1).single();
   if (!data) throw new Error("billing_settings introuvable");
   return data;
 }
 
+const DEMO_PRICING = [
+  {
+    model: "claude-sonnet-4-6",
+    effective_from: "2025-01-01",
+    input_usd_per_mtok: 3.0,
+    output_usd_per_mtok: 15.0,
+    cache_write_usd_per_mtok: 3.75,
+    cache_read_usd_per_mtok: 0.3,
+  },
+];
+
 export async function getMonthUsage(supabase: Supabase, month: string): Promise<MonthUsage> {
   const { start, end } = monthBounds(month);
 
-  const [settings, eventsRes, pricingRes] = await Promise.all([
-    getBillingSettings(supabase),
-    supabase
-      .from("ai_usage_events")
-      .select("occurred_at, source, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens")
-      .gte("occurred_at", start)
-      .lt("occurred_at", end)
-      .order("occurred_at", { ascending: true })
-      .limit(20000),
-    supabase.from("model_pricing").select("*"),
-  ]);
-
-  const pricing = pricingRes.data ?? [];
+  const demo = !supabase || isDemo();
+  const [settings, events, pricing] = demo
+    ? [
+        demoBillingSettings as BillingSettings,
+        demoUsageEvents().filter((e) => e.occurred_at >= start && e.occurred_at < end),
+        DEMO_PRICING,
+      ]
+    : await Promise.all([
+        getBillingSettings(supabase),
+        supabase!
+          .from("ai_usage_events")
+          .select("occurred_at, source, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens")
+          .gte("occurred_at", start)
+          .lt("occurred_at", end)
+          .order("occurred_at", { ascending: true })
+          .limit(20000)
+          .then((r) => r.data ?? []),
+        supabase!.from("model_pricing").select("*").then((r) => r.data ?? []),
+      ]);
   // Prix en vigueur pour (model, date) : ligne la plus récente ≤ date d'appel.
   const priceFor = (model: string, day: string) => {
     const rows = pricing
@@ -96,7 +116,7 @@ export async function getMonthUsage(supabase: Supabase, month: string): Promise<
   const bySource = new Map<string, UsageAgg>();
   const byDaySource = new Map<string, { day: string; source: string; model: string } & UsageAgg>();
 
-  for (const e of eventsRes.data ?? []) {
+  for (const e of events) {
     const day = e.occurred_at.slice(0, 10);
     const p = priceFor(e.model, day);
     const costUsd = p

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isDemo } from '@/lib/demo';
 import { baileysFetch } from '@/lib/baileys';
 
 export async function POST(req: NextRequest) {
+  if (isDemo()) return NextResponse.json({ ok: true, demo: true });
   const { phone, action } = await req.json() as { phone: string; action: 'pause' | 'resume' };
 
   const endpoint = action === 'pause' ? 'pause' : 'resume';

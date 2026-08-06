@@ -1,5 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 
+import { demoAgentConfig, isDemo } from "@/lib/demo";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,8 +33,13 @@ function countPlaceholders(value: unknown): number {
 }
 
 export default async function ReglagesPage() {
-  const supabase = await createClient();
-  const { data: config } = await supabase.from("agent_config").select("*").limit(1).single();
+  let config;
+  if (isDemo()) {
+    config = demoAgentConfig;
+  } else {
+    const supabase = await createClient();
+    config = (await supabase.from("agent_config").select("*").limit(1).single()).data;
+  }
 
   if (!config) {
     return (

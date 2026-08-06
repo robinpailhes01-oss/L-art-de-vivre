@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Bot, Coins, Download, MessagesSquare, Receipt } from "lucide-react";
 
+import { isDemo } from "@/lib/demo";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,7 +47,7 @@ export default async function FacturationPage({
   const { month: rawMonth } = await searchParams;
   const month = rawMonth && /^\d{4}-\d{2}$/.test(rawMonth) ? rawMonth : currentMonth();
 
-  const supabase = await createClient();
+  const supabase = isDemo() ? null : await createClient();
   const usage = await getMonthUsage(supabase, month);
   const s = usage.settings;
 

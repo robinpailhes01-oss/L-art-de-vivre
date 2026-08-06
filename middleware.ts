@@ -11,6 +11,19 @@ function isPublic(pathname: string) {
 }
 
 export async function middleware(request: NextRequest) {
+  // Mode démo : sans Supabase configuré, pas d'auth — tout est accessible
+  // (données fictives). Évite le crash MIDDLEWARE_INVOCATION_FAILED d'un
+  // déploiement Vercel sans variables d'environnement.
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    const { pathname } = request.nextUrl;
+    if (pathname === "/login" || pathname === "/signup") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
+
   // Refreshes the Supabase session cookie on every request.
   const { supabaseResponse, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
