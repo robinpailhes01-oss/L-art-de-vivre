@@ -39,6 +39,15 @@ exactement 2 runtimes :
 | `CRON_SECRET` | pg_cron + Vercel → agent-followups | `x-cron-secret` |
 | `BAILEYS_SERVICE_SECRET` | Vercel + Edge Functions → Baileys | `x-baileys-secret` |
 
+## Mode démo (zéro configuration)
+
+Déployé **sans aucune variable d'environnement**, le dashboard démarre en
+mode démonstration : pas de login, données fictives réalistes sur toutes les
+pages (leads, inbox, facturation, export CSV), bandeau « Mode démonstration ».
+Idéal pour montrer le produit au client avant de brancher quoi que ce soit.
+Renseigner les variables Supabase sur Vercel fait basculer en mode réel
+automatiquement.
+
 ## Développement local
 
 ```bash
